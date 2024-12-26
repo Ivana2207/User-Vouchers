@@ -1,13 +1,14 @@
+#Import statements
 from flask import Flask, request, render_template, g, jsonify, Response
 import sqlite3
 import os
 import requests
 import json
 
-# Database
+# Database path
 DATABASE = os.getenv("DATABASE_PATH", "users_vouchers.db")
 
-# Flask application
+# Flask application initialisation
 app = Flask(__name__)
 
 # Database connection
@@ -25,7 +26,7 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
-
+#Home route which returns HTML welcome message
 @app.route("/")
 def pocetna_strana():
     return '''
@@ -35,7 +36,7 @@ def pocetna_strana():
     '''
 
 
-# Calculate total spending for a user
+# Calculate total spending for a user - query to calculate total spending of a given user from the database
 def get_total_spent(user_id):
     try:
         db = get_db()
@@ -51,7 +52,7 @@ def get_total_spent(user_id):
         print(f"Database error: {e}")
         return None
 
-# Endpoint for total spending
+# Total spending endpoint which returns HTML response with the total spending or an error message if there is no data
 @app.route('/total_spent/<int:user_id>', methods=['GET'])
 def total_spent(user_id):
     total = get_total_spent(user_id)
@@ -107,7 +108,7 @@ def total_spent(user_id):
         return "<h2>No data available for this user</h2>", 404
 
 
-# Calculate average spending by age groups
+# Calculate average spending by age groups - query to calculate the average spending by age groups in the database
 def get_average_spending_by_age():
     try:
         db = get_db()
@@ -134,7 +135,9 @@ def get_average_spending_by_age():
         print(f"Database error: {e}")
         return None
 
-# Average spending by age
+# Average spending by age endpoint
+# which returns HTML response with the average spending by age group data
+# or an error message if there is a problem with retreiving data
 @app.route('/average_spending_by_age', methods=['GET'])
 def average_spending_by_age():
     result = get_average_spending_by_age()
@@ -182,7 +185,9 @@ def average_spending_by_age():
     else:
         return "<h2>Unable to retrieve data</h2>", 500
 
-#Write high spending user
+#Write high spending user endpoint which defines the route to add or update a high spending user,
+# accepts JSON data with user ID and total spending,
+# inserts or updates the database and returns a success message or error details.
 @app.route('/write_high_spending_user', methods=['POST'])
 def write_high_spending_user():
     try:
@@ -197,30 +202,40 @@ def write_high_spending_user():
         user_id = int(data['user_id'])
         total_spending = int(data['total_spending'])
 
+        if user_id <= 0 or total_spending < 0:
+            return jsonify({"error": "Invalid user_id or total_spending"}), 400
+
         db = get_db()
-
-
         cursor = db.cursor()
+
+        # Check if the user already exists
         cursor.execute("SELECT * FROM high_spenders WHERE user_id = ?", (user_id,))
         existing_user = cursor.fetchone()
 
         if existing_user:
-
-            cursor.execute("UPDATE high_spenders SET total_spending = ? WHERE user_id = ?", (total_spending, user_id))
+            # Update existing record
+            cursor.execute(
+                "UPDATE high_spenders SET total_spending = ? WHERE user_id = ?",
+                (total_spending, user_id)
+            )
         else:
-
-            cursor.execute("INSERT INTO high_spenders (user_id, total_spending) VALUES (?, ?)", (user_id, total_spending))
+            # Insert new record
+            cursor.execute(
+                "INSERT INTO high_spenders (user_id, total_spending) VALUES (?, ?)",
+                (user_id, total_spending)
+            )
 
         db.commit()
 
         return jsonify({"message": "Data added or updated successfully."}), 201
 
     except sqlite3.Error as e:
+        app.logger.error(f"Database error: {e}")
         return jsonify({"error": "Database insertion/update error", "details": str(e)}), 500
 
     except Exception as ex:
+        app.logger.error(f"Unexpected error: {ex}")
         return jsonify({"error": "Unexpected error", "details": str(ex)}), 500
-
 
 
 #Run the app
