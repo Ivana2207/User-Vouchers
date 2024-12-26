@@ -208,18 +208,18 @@ def write_high_spending_user():
         db = get_db()
         cursor = db.cursor()
 
-        # Check if the user already exists
+
         cursor.execute("SELECT * FROM high_spenders WHERE user_id = ?", (user_id,))
         existing_user = cursor.fetchone()
 
         if existing_user:
-            # Update existing record
+
             cursor.execute(
                 "UPDATE high_spenders SET total_spending = ? WHERE user_id = ?",
                 (total_spending, user_id)
             )
         else:
-            # Insert new record
+
             cursor.execute(
                 "INSERT INTO high_spenders (user_id, total_spending) VALUES (?, ?)",
                 (user_id, total_spending)
